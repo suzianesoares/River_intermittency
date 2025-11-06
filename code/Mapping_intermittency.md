@@ -1,0 +1,1842 @@
+Mapping intermittency: model train and test
+================
+Suziane Soares
+06 novembro, 2025
+
+``` r
+pacman::p_load('Boruta','caret', 'doSNOW', 'dplyr','forcats', 'ggplot2','ggpubr','Metrics','randomForest', 'raster', 'reshape')
+```
+
+``` r
+windowsFonts(Times = windowsFont("Times New Roman")) 
+```
+
+## Model training and testing: river sections
+
+### Model a: Sentinel
+
+Load observational data
+
+``` r
+data_obs_Sent <- read.csv("../Modelling_Intermittency/Input/data_input_modela.csv")[,-1] #removing an extra X column
+
+head(data_obs_Sent)
+```
+
+    ##      X Units Month Section  WC WC_int elev_mean slope_mean contr_max_km2
+    ## 1 3179 26450     6      BN Dry      1    564.83       0.01      117.7163
+    ## 2 3185 26500     6      BN Dry      1    564.58       0.01      117.7284
+    ## 3 3191 26550     6      BN Dry      1    564.74       0.01      117.7900
+    ## 4 3197 26600     6      BN Dry      1    565.15       0.02      117.7931
+    ## 5 3203 26650     6      BN Dry      1    564.02       0.01      117.8050
+    ## 6 3209 26700     6      BN Wet      4    562.77       0.00      117.8092
+    ##   stream_sum recur_mean occur_mean ext_sum Dist_fromLast Dist_toNext Dam
+    ## 1          8   39.11111   13.66667       9      2336.451    297.4536   0
+    ## 2          7   41.00000   14.83333      12      2369.916    255.2302   0
+    ## 3          6   44.77778   16.00000       9      2409.621    211.1149   0
+    ## 4          6   49.30000   18.60000      10      2454.105    165.5558   0
+    ## 5          6   49.55556   21.11111       9      2503.242    116.6920   0
+    ## 6          7   66.00000   31.40000      10         0.000      0.0000   1
+    ##   mapbio_maj mb_forest_ mb_savan_m mb_grass_m mb_past_me mb_agri_me mb_water_m
+    ## 1          3  1.0000000          0          0          0          0  0.0000000
+    ## 2          3  1.0000000          0          0          0          0  0.0000000
+    ## 3          3  1.0000000          0          0          0          0  0.0000000
+    ## 4          3  1.0000000          0          0          0          0  0.0000000
+    ## 5          3  0.7777778          0          0          0          0  0.2222222
+    ## 6         33  0.2222222          0          0          0          0  0.7777778
+    ##   mb_crops_m  acm30    api30  Level Vol_hm3 dV_hm3 SENTndvi_mean SENTndwi_mean
+    ## 1          0 77.978 5.041834 441.84    5.57  -0.01     0.2209923   -0.19214043
+    ## 2          0 77.978 5.041834 441.84    5.57  -0.01     0.2366081   -0.20087194
+    ## 3          0 77.978 5.041834 441.84    5.57  -0.01     0.2613496   -0.21690717
+    ## 4          0 77.978 5.041834 441.84    5.57  -0.01     0.2701145   -0.22401476
+    ## 5          0 77.978 5.041834 441.84    5.57  -0.01     0.2516057   -0.21319034
+    ## 6          0 77.978 5.041834 441.84    5.57  -0.01     0.1215522   -0.09866108
+    ##   SENTswi_mean SENTndmi_re_mean SENTndmi_nir_mean SENTmndwi_mean dw_majorit
+    ## 1   -0.2619573     -0.051952238       -0.10996064     -0.2961109          5
+    ## 2   -0.2610732     -0.038047746       -0.09716495     -0.2925577          5
+    ## 3   -0.2441073     -0.003727894       -0.06032722     -0.2737629          1
+    ## 4   -0.2323466      0.015184108       -0.04069009     -0.2624165          1
+    ## 5   -0.2170653      0.013855802       -0.03961527     -0.2506984          1
+    ## 6   -0.1383617     -0.021445988       -0.06631402     -0.1636074          1
+    ##   bare_freq built_freq crops_freq flooded_freq grass_freq shrubs_freq
+    ## 1         0          0          0            0          0   1.0000000
+    ## 2         0          0          0            0          0   0.8481013
+    ## 3         0          0          0            0          0   0.3333333
+    ## 4         0          0          0            0          0   0.0000000
+    ## 5         0          0          0            0          0   0.0000000
+    ## 6         0          0          0            0          0   0.1666667
+    ##   trees_freq water_freq
+    ## 1  0.0000000  0.0000000
+    ## 2  0.1518987  0.0000000
+    ## 3  0.6666667  0.0000000
+    ## 4  1.0000000  0.0000000
+    ## 5  1.0000000  0.0000000
+    ## 6  0.4615385  0.3717949
+
+``` r
+set.seed(100)
+index <- createDataPartition(data_obs_Sent[,5], p=0.75, list=FALSE)
+
+x_train_a <- data_obs_Sent[index,-c(1:6)]
+x_test_a <- data_obs_Sent[-index,-c(1:6)]
+
+y_train_a <- as.factor(data_obs_Sent[index,5])
+y_test_a <- as.factor(data_obs_Sent[-index,5])
+```
+
+``` r
+#mtry
+sqrt(ncol(x_train_a))
+```
+
+    ## [1] 6.164414
+
+``` r
+set.seed(1000)
+   rf_Sentx <- randomForest(x = x_train_a, y = y_train_a,
+                       ntree = 500,
+                       mtry = 6,
+                       importance = TRUE,
+                      proximity = TRUE)
+print(rf_Sentx)
+```
+
+    ## 
+    ## Call:
+    ##  randomForest(x = x_train_a, y = y_train_a, ntree = 500, mtry = 6,      importance = TRUE, proximity = TRUE) 
+    ##                Type of random forest: classification
+    ##                      Number of trees: 500
+    ## No. of variables tried at each split: 6
+    ## 
+    ##         OOB estimate of  error rate: 20.26%
+    ## Confusion matrix:
+    ##           Dry NotDet Partially Wet class.error
+    ## Dry       210     24         0   8   0.1322314
+    ## NotDet     30     91         1   1   0.2601626
+    ## Partially   4      1         0   1   1.0000000
+    ## Wet        16      6         0  61   0.2650602
+
+``` r
+#save(rf_Sent,file="rf_Sent.RData")
+#load("rf_Sent.RData")
+```
+
+**Comparar feito aqui com o que está no artigo**
+
+``` r
+# load("rf_Sent.RData")
+# print(rf_Sent)
+```
+
+### Model b: Planetscope
+
+Load observational data
+
+``` r
+data_obs_PS <- read.csv( "../Modelling_Intermittency/Input/data_input_modelb.csv")[,-1] #removing an extra X column
+
+head(data_obs_PS)
+```
+
+    ##      X Units Month Section     WC WC_int elev_mean slope_mean contr_max_km2
+    ## 1 3177 26450     4      BN NotDet      2    564.83       0.01      117.7163
+    ## 2 3179 26450     6      BN    Dry      1    564.83       0.01      117.7163
+    ## 3 3183 26500     4      BN NotDet      2    564.58       0.01      117.7284
+    ## 4 3185 26500     6      BN    Dry      1    564.58       0.01      117.7284
+    ## 5 3189 26550     4      BN NotDet      2    564.74       0.01      117.7900
+    ## 6 3191 26550     6      BN    Dry      1    564.74       0.01      117.7900
+    ##   stream_sum recur_mean occur_mean ext_sum Dist_fromLast Dist_toNext Dam
+    ## 1          8   39.11111   13.66667       9      2336.451    297.4536   0
+    ## 2          8   39.11111   13.66667       9      2336.451    297.4536   0
+    ## 3          7   41.00000   14.83333      12      2369.916    255.2302   0
+    ## 4          7   41.00000   14.83333      12      2369.916    255.2302   0
+    ## 5          6   44.77778   16.00000       9      2409.621    211.1149   0
+    ## 6          6   44.77778   16.00000       9      2409.621    211.1149   0
+    ##   mapbio_maj mb_forest_ mb_savan_m mb_grass_m mb_past_me mb_agri_me mb_water_m
+    ## 1          3          1          0          0          0          0          0
+    ## 2          3          1          0          0          0          0          0
+    ## 3          3          1          0          0          0          0          0
+    ## 4          3          1          0          0          0          0          0
+    ## 5          3          1          0          0          0          0          0
+    ## 6          3          1          0          0          0          0          0
+    ##   mb_crops_m   acm30     api30  Level Vol_hm3 dV_hm3 PSndvi_mean PSndwi_mean
+    ## 1          0 134.366 48.933429 441.95    5.70   0.00   0.7915066  -0.6689139
+    ## 2          0  77.978  5.041834 441.84    5.57  -0.01   0.5544926  -0.5906996
+    ## 3          0 134.366 48.933429 441.95    5.70   0.00   0.7783583  -0.6626292
+    ## 4          0  77.978  5.041834 441.84    5.57  -0.01   0.5826700  -0.6061324
+    ## 5          0 134.366 48.933429 441.95    5.70   0.00   0.7410407  -0.6462722
+    ## 6          0  77.978  5.041834 441.84    5.57  -0.01   0.6165910  -0.6202843
+
+``` r
+set.seed(100)
+index <- createDataPartition(data_obs_PS[,5], p=0.75, list=FALSE)
+
+x_train_b <- data_obs_PS[index,-c(1:6)]
+x_test_b <- data_obs_PS[-index,-c(1:6)]
+
+y_train_b <- as.factor(data_obs_PS[index,5])
+y_test_b <- as.factor(data_obs_PS[-index,5])
+```
+
+``` r
+#mtry
+sqrt(ncol(x_train_b))
+```
+
+    ## [1] 5
+
+``` r
+set.seed(1000)
+   rf_PSx <- randomForest(x = x_train_b, y = y_train_b,
+                       ntree = 500,
+                       mtry = 5,
+                       importance = TRUE,
+                       proximity = TRUE)
+print(rf_PSx)
+```
+
+    ## 
+    ## Call:
+    ##  randomForest(x = x_train_b, y = y_train_b, ntree = 500, mtry = 5,      importance = TRUE, proximity = TRUE) 
+    ##                Type of random forest: classification
+    ##                      Number of trees: 500
+    ## No. of variables tried at each split: 5
+    ## 
+    ##         OOB estimate of  error rate: 22.83%
+    ## Confusion matrix:
+    ##           Dry NotDet Partially Wet class.error
+    ## Dry       224     31         0  11   0.1578947
+    ## NotDet     41    137         2   3   0.2513661
+    ## Partially   4      7         6   3   0.7000000
+    ## Wet        16     12         4  86   0.2711864
+
+``` r
+#save(rf_PS,file="rf_PS.RData")
+```
+
+**Comparar feito aqui com o que está no artigo**
+
+``` r
+# load("rf_PS.RData")
+# print(rf_PS)
+# varImpPlot(rf_PS,
+#            sort = T,
+#            n.var = 10,
+#            main = "Top 20 Variable Importance")
+```
+
+### Model c: Precipitation
+
+``` r
+data_obs_UAV <- read.csv('../Modelling_Intermittency/Input/data_input_modelc.csv')[,-1]
+
+head(data_obs_UAV)
+```
+
+    ##      X Units Month Section     WC WC_int elev_mean slope_mean contr_max_km2
+    ## 1 3177 26450     4      BN NotDet      2    564.83       0.01      117.7163
+    ## 2 3179 26450     6      BN    Dry      1    564.83       0.01      117.7163
+    ## 3 3183 26500     4      BN NotDet      2    564.58       0.01      117.7284
+    ## 4 3185 26500     6      BN    Dry      1    564.58       0.01      117.7284
+    ## 5 3189 26550     4      BN NotDet      2    564.74       0.01      117.7900
+    ## 6 3191 26550     6      BN    Dry      1    564.74       0.01      117.7900
+    ##   stream_sum recur_mean occur_mean ext_sum Dist_fromLast Dist_toNext Dam
+    ## 1          8   39.11111   13.66667       9      2336.451    297.4536   0
+    ## 2          8   39.11111   13.66667       9      2336.451    297.4536   0
+    ## 3          7   41.00000   14.83333      12      2369.916    255.2302   0
+    ## 4          7   41.00000   14.83333      12      2369.916    255.2302   0
+    ## 5          6   44.77778   16.00000       9      2409.621    211.1149   0
+    ## 6          6   44.77778   16.00000       9      2409.621    211.1149   0
+    ##   mapbio_maj mb_forest_ mb_savan_m mb_grass_m mb_past_me mb_agri_me mb_water_m
+    ## 1          3          1          0          0          0          0          0
+    ## 2          3          1          0          0          0          0          0
+    ## 3          3          1          0          0          0          0          0
+    ## 4          3          1          0          0          0          0          0
+    ## 5          3          1          0          0          0          0          0
+    ## 6          3          1          0          0          0          0          0
+    ##   mb_crops_m   acm30     api30  Level Vol_hm3 dV_hm3
+    ## 1          0 134.366 48.933429 441.95    5.70   0.00
+    ## 2          0  77.978  5.041834 441.84    5.57  -0.01
+    ## 3          0 134.366 48.933429 441.95    5.70   0.00
+    ## 4          0  77.978  5.041834 441.84    5.57  -0.01
+    ## 5          0 134.366 48.933429 441.95    5.70   0.00
+    ## 6          0  77.978  5.041834 441.84    5.57  -0.01
+
+``` r
+set.seed(100)
+index <- createDataPartition(data_obs_UAV[,5], p=0.75, list=FALSE)
+
+x_train_c <- data_obs_UAV[index,-c(1:6)]
+x_test_c <- data_obs_UAV[-index,-c(1:6)]
+
+y_train_c <- as.factor(data_obs_UAV[index,5])
+y_test_c <- as.factor(data_obs_UAV[-index,5])
+```
+
+``` r
+#mtry
+sqrt(ncol(x_train_c))
+```
+
+    ## [1] 4.795832
+
+``` r
+set.seed(1000)
+   rf_Dronex <- randomForest(x = x_train_c, y = y_train_c,
+                       ntree = 500,
+                       mtry = 5,
+                       importance = TRUE,
+                      proximity = TRUE)
+print(rf_Dronex)
+```
+
+    ## 
+    ## Call:
+    ##  randomForest(x = x_train_c, y = y_train_c, ntree = 500, mtry = 5,      importance = TRUE, proximity = TRUE) 
+    ##                Type of random forest: classification
+    ##                      Number of trees: 500
+    ## No. of variables tried at each split: 5
+    ## 
+    ##         OOB estimate of  error rate: 18.39%
+    ## Confusion matrix:
+    ##           Dry NotDet Partially Wet class.error
+    ## Dry       238     44         1   8   0.1821306
+    ## NotDet     38    346         7   8   0.1328321
+    ## Partially   2     16        25  11   0.5370370
+    ## Wet        17     11         6 141   0.1942857
+
+``` r
+#save(rf_Drone, file="rf_Drone.RData")
+```
+
+``` r
+# load("rf_Drone.RData")
+# 
+# print(rf_Drone)
+```
+
+## Recursive Feature Elimination (RFE)
+
+For all models, we applied the algorithm RFE to select the best
+predictors
+
+### Model a: Sentinel
+
+``` r
+ctrl <- rfeControl(functions = rfFuncs,
+                   method = "repeatedcv",
+                   repeats = 5,
+                   verbose = FALSE)
+
+subsets <- c(1:5, seq(6,38,2))
+
+rfProfile <- rfe(x=x_train_a, y=y_train_a,
+                 sizes = subsets,
+                 rfeControl = ctrl)
+
+print(rfProfile)
+
+rfProfile$fit
+```
+
+``` r
+RFE_rfSent <- rfProfile 
+#save(RFE_rfSent,file = "RFE_rfSent.RData")
+```
+
+### Model b: Planetscope
+
+``` r
+ctrl <- rfeControl(functions = rfFuncs,
+                   method = "repeatedcv",
+                   repeats = 5,
+                   verbose = FALSE)
+
+subsets <- c(1:5, seq(6,25,2))
+
+rfProfile <- rfe(x=x_train_b, y=y_train_b,
+                 sizes = subsets,
+                 rfeControl = ctrl)
+
+print(rfProfile)
+
+rfProfile$fit
+```
+
+``` r
+RFE_rfPS <- rfProfile 
+#save(RFE_rfPS,file = "RFE_rfPS.RData")
+```
+
+### Model c: Precipitation
+
+``` r
+ctrl <- rfeControl(functions = rfFuncs,
+                   method = "repeatedcv",
+                   repeats = 5,
+                   verbose = FALSE)
+
+subsets <- c(1:5, seq(6,25,2))
+
+rfProfile <- rfe(x=x_train_c, y=y_train_c,
+                 sizes = subsets,
+                 rfeControl = ctrl)
+
+print(rfProfile)
+
+rfProfile$fit
+```
+
+``` r
+RFE_rfDrone <- rfProfile 
+#save(RFE_rfDrone,file = "RFE_rfDrone.RData")
+```
+
+\#Export rfe Profile: Sentinel, planetscope, precipitation
+
+``` r
+#plot(rfProfile$results[1:2])
+
+
+load("RFE_rfSent.RData")
+rfe_sent_result <- RFE_rfSent$results[1:2]
+rfe_sent_result$model <- "Model a"
+
+
+load("RFE_rfPS.RData")
+rfe_ps_result <- RFE_rfPS$results[1:2]
+rfe_ps_result$model <- "Model b"
+
+load("RFE_rfDrone.RData")
+rfe_dr_result <- RFE_rfDrone$results[1:2]
+rfe_dr_result$model <- "Model c"
+```
+
+``` r
+rfe_result <- rbind(rfe_ps_result,rfe_sent_result,rfe_dr_result)
+rfe_result$model <- factor(rfe_result$model, levels=c("Model a","Model b","Model c"))
+rfe_result$Accuracy <- rfe_result$Accuracy*100
+
+#png(file = "Output/RD_RFE_models2.png", bg = "white", units="in", width=9, height=3, res=300)
+ggplot(rfe_result, aes(x=Variables, y=Accuracy, color=model))+
+  geom_line()+
+  geom_point(aes(shape=model), size=2)+
+  ylab("Overall accuracy (%)")+
+  xlab("Number of predictors") +
+    scale_x_continuous(expand=c(0.01,0),breaks = seq(0,50,5), limits = c(0,40))+
+    scale_y_continuous(limits = c(50,82))+ #c(50,82)
+  scale_color_manual(values=c('black','#bdbdbd','#636363'))+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = c(0.8, 0.2),
+        text = element_text(size = 16, family="serif"))
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+
+``` r
+#windowsFonts()
+```
+
+``` r
+#plot(rfProfile$results[1:2])
+
+
+load("RFE_rfSent.RData")
+rfe_sent_result <- RFE_rfSent$results[1:2]
+rfe_sent_result$model <- "Model a"
+
+
+load("RFE_rfPS.RData")
+rfe_ps_result <- RFE_rfPS$results[1:2]
+rfe_ps_result$model <- "Model b"
+
+load("RFE_rfDrone.RData")
+rfe_dr_result <- RFE_rfDrone$results[1:2]
+rfe_dr_result$model <- "Model c"
+```
+
+``` r
+rfe_result <- rbind(rfe_ps_result,rfe_sent_result,rfe_dr_result)
+rfe_result$model <- factor(rfe_result$model, levels=c("Model a","Model b","Model c"))
+rfe_result$Accuracy <- rfe_result$Accuracy*100
+
+#png(file = "Output/RD_RFE_models2.png", bg = "white", units="in", width=9, height=3, res=300)
+ggplot(rfe_result, aes(x=Variables, y=Accuracy, color=model))+
+  geom_line()+
+  geom_point(aes(shape=model), size=2)+
+  ylab("Overall accuracy (%)")+
+  xlab("Number of predictors") +
+    scale_x_continuous(expand=c(0.01,0),breaks = seq(0,50,5), limits = c(0,40))+
+    scale_y_continuous(limits = c(50,82))+ #c(50,82)
+  scale_color_manual(values=c('black','#bdbdbd','#636363'))+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = c(0.8, 0.2),
+        text = element_text(size = 16, family="serif"))
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
+
+``` r
+#windowsFonts()
+```
+
+## Selected classification models: same test data for all
+
+Model training with only selected predictors.
+
+### Model a: Sentinel
+
+``` r
+data_obs_Sent <- data_obs_Sent[,-c(8,10:13,16:34,36:44)]
+head(data_obs_Sent)
+```
+
+    ##      X Units Month Section  WC WC_int elev_mean contr_max_km2 Dist_fromLast
+    ## 1 3179 26450     6      BN Dry      1    564.83      117.7163      2336.451
+    ## 2 3185 26500     6      BN Dry      1    564.58      117.7284      2369.916
+    ## 3 3191 26550     6      BN Dry      1    564.74      117.7900      2409.621
+    ## 4 3197 26600     6      BN Dry      1    565.15      117.7931      2454.105
+    ## 5 3203 26650     6      BN Dry      1    564.02      117.8050      2503.242
+    ## 6 3209 26700     6      BN Wet      4    562.77      117.8092         0.000
+    ##   Dist_toNext SENTmndwi_mean
+    ## 1    297.4536     -0.2961109
+    ## 2    255.2302     -0.2925577
+    ## 3    211.1149     -0.2737629
+    ## 4    165.5558     -0.2624165
+    ## 5    116.6920     -0.2506984
+    ## 6      0.0000     -0.1636074
+
+``` r
+set.seed(100)
+index <- createDataPartition(data_obs_Sent[,5], p=0.75, list=FALSE)
+
+x_train_a <- data_obs_Sent[index,-c(1:6)]
+x_test_a <- data_obs_Sent[-index,-c(1:6)]
+
+y_train_a <- as.factor(data_obs_Sent[index,5])
+y_test_a <- as.factor(data_obs_Sent[-index,5])
+```
+
+``` r
+set.seed(100)
+   rf_selSent5x <- randomForest(x = x_train_a, y = y_train_a,
+                       ntree = 500,
+                       mtry = 2,
+                       importance = TRUE,
+                      proximity = TRUE,
+                      keep.inbag = TRUE)
+
+print(rf_selSent5x)
+```
+
+    ## 
+    ## Call:
+    ##  randomForest(x = x_train_a, y = y_train_a, ntree = 500, mtry = 2,      importance = TRUE, proximity = TRUE, keep.inbag = TRUE) 
+    ##                Type of random forest: classification
+    ##                      Number of trees: 500
+    ## No. of variables tried at each split: 2
+    ## 
+    ##         OOB estimate of  error rate: 20.48%
+    ## Confusion matrix:
+    ##           Dry NotDet Partially Wet class.error
+    ## Dry       206     29         1   6   0.1487603
+    ## NotDet     28     89         1   5   0.2764228
+    ## Partially   2      1         0   3   1.0000000
+    ## Wet         8      8         1  66   0.2048193
+
+``` r
+#save(rf_selSent5, file="rf_selSent5.RData")
+#load("rf_selSent5.RData")
+#print(rf_selSent5)
+
+#varImp(rf_selSent5)
+```
+
+### Model b: Planetscope
+
+``` r
+data_obs_PS <- data_obs_PS[,-c(8,10:13,16:29,31)]
+head(data_obs_PS)
+```
+
+    ##      X Units Month Section     WC WC_int elev_mean contr_max_km2 Dist_fromLast
+    ## 1 3177 26450     4      BN NotDet      2    564.83      117.7163      2336.451
+    ## 2 3179 26450     6      BN    Dry      1    564.83      117.7163      2336.451
+    ## 3 3183 26500     4      BN NotDet      2    564.58      117.7284      2369.916
+    ## 4 3185 26500     6      BN    Dry      1    564.58      117.7284      2369.916
+    ## 5 3189 26550     4      BN NotDet      2    564.74      117.7900      2409.621
+    ## 6 3191 26550     6      BN    Dry      1    564.74      117.7900      2409.621
+    ##   Dist_toNext PSndvi_mean
+    ## 1    297.4536   0.7915066
+    ## 2    297.4536   0.5544926
+    ## 3    255.2302   0.7783583
+    ## 4    255.2302   0.5826700
+    ## 5    211.1149   0.7410407
+    ## 6    211.1149   0.6165910
+
+``` r
+set.seed(100)
+index <- createDataPartition(data_obs_PS[,5], p=0.75, list=FALSE)
+
+x_train_b <- data_obs_PS[index,-c(1:6)]
+x_test_b <- data_obs_PS[-index,-c(1:6)]
+
+y_train_b <- as.factor(data_obs_PS[index,5])
+y_test_b <- as.factor(data_obs_PS[-index,5])
+```
+
+``` r
+#mtry
+sqrt(ncol(x_train_b))
+```
+
+    ## [1] 2.236068
+
+``` r
+set.seed(1000)
+   rf_PS5x <- randomForest(x = x_train_b, y = y_train_b,
+                       ntree = 500,
+                       mtry = 5,
+                       importance = TRUE,
+                       proximity = TRUE)
+print(rf_PS5x)
+```
+
+    ## 
+    ## Call:
+    ##  randomForest(x = x_train_b, y = y_train_b, ntree = 500, mtry = 5,      importance = TRUE, proximity = TRUE) 
+    ##                Type of random forest: classification
+    ##                      Number of trees: 500
+    ## No. of variables tried at each split: 5
+    ## 
+    ##         OOB estimate of  error rate: 22.49%
+    ## Confusion matrix:
+    ##           Dry NotDet Partially Wet class.error
+    ## Dry       221     32         2  11   0.1691729
+    ## NotDet     38    133         4   8   0.2732240
+    ## Partially   5      4         7   4   0.6500000
+    ## Wet        11     10         3  94   0.2033898
+
+``` r
+#save(rf_PS,file="rf_PS.RData")
+```
+
+**Comparar feito aqui com o que está no artigo**
+
+``` r
+# load("rf_selPS5.RData")
+# print(rf_selPS5)
+```
+
+### Model c: Precipitation
+
+``` r
+data_obs_UAV <- data_obs_UAV[,-c(8,10,11:13,16:24,26:30)]
+
+head(data_obs_UAV)
+```
+
+    ##      X Units Month Section     WC WC_int elev_mean contr_max_km2 Dist_fromLast
+    ## 1 3177 26450     4      BN NotDet      2    564.83      117.7163      2336.451
+    ## 2 3179 26450     6      BN    Dry      1    564.83      117.7163      2336.451
+    ## 3 3183 26500     4      BN NotDet      2    564.58      117.7284      2369.916
+    ## 4 3185 26500     6      BN    Dry      1    564.58      117.7284      2369.916
+    ## 5 3189 26550     4      BN NotDet      2    564.74      117.7900      2409.621
+    ## 6 3191 26550     6      BN    Dry      1    564.74      117.7900      2409.621
+    ##   Dist_toNext   acm30
+    ## 1    297.4536 134.366
+    ## 2    297.4536  77.978
+    ## 3    255.2302 134.366
+    ## 4    255.2302  77.978
+    ## 5    211.1149 134.366
+    ## 6    211.1149  77.978
+
+``` r
+set.seed(100)
+index <- createDataPartition(data_obs_UAV[,5], p=0.75, list=FALSE)
+
+x_train_c <- data_obs_UAV[index,-c(1:6)]
+x_test_c <- data_obs_UAV[-index,-c(1:6)]
+
+y_train_c <- as.factor(data_obs_UAV[index,5])
+y_test_c <- as.factor(data_obs_UAV[-index,5])
+```
+
+``` r
+#mtry
+sqrt(ncol(x_train_c))
+```
+
+    ## [1] 2.236068
+
+``` r
+set.seed(1000)
+   rf_Drone5x <- randomForest(x = x_train_c, y = y_train_c,
+                       ntree = 500,
+                       mtry = 5,
+                       importance = TRUE,
+                      proximity = TRUE)
+print(rf_Drone5x)
+```
+
+    ## 
+    ## Call:
+    ##  randomForest(x = x_train_c, y = y_train_c, ntree = 500, mtry = 5,      importance = TRUE, proximity = TRUE) 
+    ##                Type of random forest: classification
+    ##                      Number of trees: 500
+    ## No. of variables tried at each split: 5
+    ## 
+    ##         OOB estimate of  error rate: 18.93%
+    ## Confusion matrix:
+    ##           Dry NotDet Partially Wet class.error
+    ## Dry       240     36         4  11   0.1752577
+    ## NotDet     41    341         9   8   0.1453634
+    ## Partially   3     11        28  12   0.4814815
+    ## Wet        16     16         7 136   0.2228571
+
+``` r
+#save(rf_Drone, file="rf_Drone.RData")
+```
+
+``` r
+# load("rf_selDrone5.RData")
+# 
+# print(rf_selDrone5)
+```
+
+``` r
+ac <- data.frame(Models = c("model a", "model b", "model c"),
+                 Dry = rep(NA,3),
+                 NotDe = rep(NA,3),
+                 Partially = rep(NA,3),
+                 Wet = rep(NA,3),
+                 overall_acc = rep(NA,3),
+                 kappa = rep(NA,3))
+
+ ac[1,2:5] <- confusionMatrix(rf_selSent5x$predicted, reference=y_train_a)[["byClass"]][,11]
+ac[3,2:5] <- confusionMatrix(rf_Drone5x$predicted, reference=y_train_c)[["byClass"]][,11]
+ac[2,2:5] <- confusionMatrix(rf_PS5x$predicted, reference=y_train_b)[["byClass"]][,11]
+
+ac[1,6:7] <- confusionMatrix(rf_selSent5x$predicted, reference=y_train_a)[["overall"]][1:2]
+ac[2,6:7] <- confusionMatrix(rf_PS5x$predicted, reference=y_train_b)[["overall"]][1:2]
+ac[3,6:7] <- confusionMatrix(rf_Drone5x$predicted, reference=y_train_c)[["overall"]][1:2]
+
+ac
+```
+
+    ##    Models       Dry     NotDe Partially       Wet overall_acc     kappa
+    ## 1 model a 0.8359972 0.8043868 0.4966518 0.8787224   0.7951542 0.6616529
+    ## 2 model b 0.8313014 0.8064573 0.6670635 0.8737848   0.7751278 0.6549150
+    ## 3 model c 0.8646004 0.8667414 0.7476986 0.8677381   0.8106638 0.7166033
+
+``` r
+#write.csv(ac, "Output/accuracy_all classes_train.csv")
+```
+
+### OOB errors
+
+``` r
+obbs <- data.frame(`Modelc_sel` = rep(NA,500),
+                   `ModelC_all` = rep(NA,500), #25
+                   `Modelb_sel` = rep(NA,500),
+                   `ModelB_all` = rep(NA,500), #27
+                   `Modela_sel` = rep(NA,500),
+                   `ModelA_all` = rep(NA,500), #32
+                   Benchmark=rep(0.5653,500))
+
+#load('rf_selDrone5.RData')
+#load('rf_Drone.RData')
+obbs[1] <- rf_Drone5x$err.rate[,1]
+obbs[2] <- rf_Dronex$err.rate[,1]
+
+# load('rf_selPS5.RData')
+# load('rf_PS.RData')
+obbs[3] <- rf_PS5x$err.rate[,1]
+obbs[4] <- rf_PSx$err.rate[,1]
+
+#load('rf_selSent5.RData')
+#load('rf_Sent.RData')
+obbs[5] <- rf_selSent5x$err.rate[,1]
+obbs[6] <- rf_Sentx$err.rate[,1]
+```
+
+melting, then spliting groups: a group with all variables and one group
+with selected
+
+``` r
+obb <- melt(obbs) #[,-c(2,4,6)]
+```
+
+    ## Using  as id variables
+
+``` r
+obb$value <- obb$value*100
+
+#split groups
+oob <- obb %>%
+  mutate(group = ifelse(grepl("_sel", obb$variable), "Selected predictors",
+                 ifelse(grepl("_all", obb$variable),"All predictors", "Benchmark")))
+
+
+oob$group <- factor(oob$group, levels = c("Benchmark","Selected predictors","All predictors")) 
+```
+
+``` r
+oob$variable <- gsub(c("Modela_sel"), c("Model a"), oob$variable)
+oob$variable <- gsub(c("Modelb_sel"), c("Model b"), oob$variable)
+oob$variable <- gsub(c("Modelc_sel"), c("Model c"), oob$variable)
+
+oob$variable <- factor(oob$variable, levels = c("Benchmark","ModelA_all","Model a","ModelB_all","Model b", "ModelC_all","Model c")) 
+```
+
+``` r
+ggplot(oob)+
+  geom_boxplot(aes(x=value,y=factor(variable), colour=group, fill=group))+
+  xlab("Out of bag errors (%)")+ylab('')+
+  scale_y_discrete(limits=rev)+
+  theme_classic()+
+  scale_colour_manual(values = c("black", "grey40", "grey"))+
+  scale_fill_manual(values = c("black","white","white"))+
+  theme(text=element_text(size= 16, family= "Times"),
+        legend.title = element_blank(),
+        legend.position = "top")
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-39-1.png)<!-- -->
+
+## Display the results
+
+Here we split again the dataset into training and testing sets, runs
+predictions using the final random forest models, and prepares the data
+for visualization. It then plots observed and predicted water condition
+classes along the river length for both training and testing periods,
+with facets showing monthly variations in the sections.
+
+### Model a
+
+``` r
+# Set a random seed for reproducibility
+set.seed(100)
+
+# Split the dataset into training (75%) and testing (25%) sets
+# The split is stratified based on the 5th column of 'data_obs_Sent'
+index <- createDataPartition(data_obs_Sent[,5], p=0.75, list=FALSE)
+
+# Select the predictor variables (excluding columns 1 to 6) for training and testing
+x_train_a <- data_obs_Sent[index, -c(1:6)]
+x_test_a  <- data_obs_Sent[-index, -c(1:6)]
+
+# Select the response variable (5th column) and convert it to a factor
+y_train_a <- as.factor(data_obs_Sent[index, 5])
+y_test_a  <- as.factor(data_obs_Sent[-index, 5])
+
+# Rename the 5th column to "obs" to indicate observed values
+colnames(data_obs_Sent)[5] <- "obs"
+
+# Prepare training data for visualization
+train_plot <- data_obs_Sent[index, ]
+train_plot$pred <- rf_selSent5x$predicted   # Add model predictions to the training data
+
+
+# Reshape data into long format for plotting ("obs" vs "pred")
+train_plot <- melt(train_plot[, -c(1,6,10)], measure.vars = c("obs", "pred"))
+
+# Make predictions on the test set using the random forest model
+set.seed(100)
+predictions <- predict(rf_selSent5x, x_test_a)
+
+# Combine test features with observed and predicted values
+result <- x_test_a
+result['obs']  <- y_test_a
+result['pred'] <- predictions
+
+# Evaluate model performance using a confusion matrix
+confusionMatrix(predictions, y_test_a, positive = "Wet")
+```
+
+    ## Confusion Matrix and Statistics
+    ## 
+    ##            Reference
+    ## Prediction  Dry NotDet Partially Wet
+    ##   Dry        68     12         1   2
+    ##   NotDet     10     26         1   1
+    ##   Partially   1      0         0   0
+    ##   Wet         1      2         0  24
+    ## 
+    ## Overall Statistics
+    ##                                          
+    ##                Accuracy : 0.7919         
+    ##                  95% CI : (0.7179, 0.854)
+    ##     No Information Rate : 0.5369         
+    ##     P-Value [Acc > NIR] : 8.173e-11      
+    ##                                          
+    ##                   Kappa : 0.653          
+    ##                                          
+    ##  Mcnemar's Test P-Value : NA             
+    ## 
+    ## Statistics by Class:
+    ## 
+    ##                      Class: Dry Class: NotDet Class: Partially Class: Wet
+    ## Sensitivity              0.8500        0.6500         0.000000     0.8889
+    ## Specificity              0.7826        0.8899         0.993197     0.9754
+    ## Pos Pred Value           0.8193        0.6842         0.000000     0.8889
+    ## Neg Pred Value           0.8182        0.8739         0.986486     0.9754
+    ## Prevalence               0.5369        0.2685         0.013423     0.1812
+    ## Detection Rate           0.4564        0.1745         0.000000     0.1611
+    ## Detection Prevalence     0.5570        0.2550         0.006711     0.1812
+    ## Balanced Accuracy        0.8163        0.7700         0.496599     0.9321
+
+``` r
+# Prepare test data for visualization
+test_plot <- cbind(data_obs_Sent[-index, -c(1,6,10)], result[, 6:7])
+
+# Reshape test data into long format ("obs" vs "pred")
+test_plot <- melt(test_plot, measure.vars = c("obs", "pred"))
+
+# Label dataset partitions (train/test)
+test_plot$part  <- "test"
+train_plot$part <- "train"
+
+# Combine both datasets into one for comparison
+part_plot <- rbind(train_plot, test_plot)
+part_plot$part <- factor(part_plot$part, levels = c("train", "test"))
+
+# Format the Month variable for plotting
+part_plot$Month <- paste(part_plot$Month, "/2022", sep = "")
+part_plot$Month <- factor(part_plot$Month, levels = c("5/2022", "6/2022", "11/2022"))
+
+# Clean and standardize categorical labels
+part_plot$value <- gsub("Partially", "Transition", part_plot$value)
+part_plot$value <- gsub("NotDet", "Not Determined", part_plot$value)
+part_plot$value <- factor(part_plot$value,
+                          levels = c("Not Determined", "Dry", "Transition", "Wet"))
+
+head(train_plot)
+```
+
+    ##   Units Month Section elev_mean contr_max_km2 Dist_fromLast SENTmndwi_mean
+    ## 1 26450     6      BN    564.83      117.7163      2336.451     -0.2961109
+    ## 2 26500     6      BN    564.58      117.7284      2369.916     -0.2925577
+    ## 3 26550     6      BN    564.74      117.7900      2409.621     -0.2737629
+    ## 4 26600     6      BN    565.15      117.7931      2454.105     -0.2624165
+    ## 5 26650     6      BN    564.02      117.8050      2503.242     -0.2506984
+    ## 6 26700     6      BN    562.77      117.8092         0.000     -0.1636074
+    ##   variable value  part
+    ## 1      obs   Dry train
+    ## 2      obs   Dry train
+    ## 3      obs   Dry train
+    ## 4      obs   Dry train
+    ## 5      obs   Dry train
+    ## 6      obs   Wet train
+
+``` r
+head(test_plot)
+```
+
+    ##   Units Month Section elev_mean contr_max_km2 Dist_fromLast SENTmndwi_mean
+    ## 1 26750     6      BN    562.90      117.9719        0.0000    -0.06721749
+    ## 2 26900     6      BN    564.72      118.1061      133.2142    -0.26370309
+    ## 3 27100     6      BN    564.29      118.1164      315.0852    -0.32616087
+    ## 4 27450     6      BN    564.50      120.7858      574.2019    -0.33638320
+    ## 5 27500     6      BN    564.63      120.7911      534.7151    -0.33230866
+    ## 6 27550     6      BN    564.48      120.8606      549.0816    -0.31410044
+    ##   variable  value part
+    ## 1      obs    Wet test
+    ## 2      obs    Dry test
+    ## 3      obs    Dry test
+    ## 4      obs    Dry test
+    ## 5      obs    Dry test
+    ## 6      obs NotDet test
+
+Test showing the results for the Aroeira reach with Sentinel model.
+Points are colored by class and shaped by dataset (training or testing),
+allowing an easy visual comparison of model performance across river
+segments and months.
+
+``` r
+# Define custom colors for water condition categories
+wc_colors <- c("#CA0020", "#F4A582", "#92C5DE", "#1F78B4")
+
+# Create ggplot for the ARO section
+p <- part_plot %>%
+  filter(Section == "ARO") %>%
+  ggplot(aes(x = Units/1000, y = variable, 
+             color = value, shape = part, group = part)) + 
+        ggtitle("Model a \nDownstream reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = "River length since the source of the river (km)", 
+             y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        scale_x_continuous(limits = c(85, 89)) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "top",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Extract legend separately
+legend_2 <- get_legend(p)
+```
+
+    ## Warning: Removed 64 rows containing missing values or values outside the scale range
+    ## (`geom_point()`).
+
+``` r
+# Combine legend and plot
+ggarrange(
+  legend_2,
+  p + theme(legend.position = "none"),
+  ncol = 1, nrow = 2,
+  heights = c(0.3, 3)
+)
+```
+
+    ## Warning: Removed 64 rows containing missing values or values outside the scale range
+    ## (`geom_point()`).
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-41-1.png)<!-- -->
+
+The code below generates comparative plots for all river
+sections—upstream (BN), middle (BAR), and downstream (ARO). Each panel
+shows observed and predicted water condition classes along the river
+length, separated by month. The combined figure allows visual assessment
+of spatial and temporal patterns in model performance across the full
+river reach.
+
+``` r
+# Define colors (only three categories are present in this section)
+wc_colors <- c("#CA0020", "#F4A582", "#1F78B4")
+
+# Plot for the upstream reach (BN)
+u <- part_plot %>%
+  filter(Section == "BN") %>%
+  ggplot(aes(x = Units/1000, y = variable, color = value, shape = part, group = part)) + 
+        ggtitle("Model a \nUpstream reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = " ", y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "none",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Define colors again (four categories for middle and downstream reaches)
+wc_colors <- c("#CA0020", "#F4A582", "#92C5DE", "#1F78B4")
+
+# Plot for the middle reach (BAR)
+m <- part_plot %>%
+  filter(Section == "BAR") %>%
+  ggplot(aes(x = Units/1000, y = variable, color = value, shape = part, group = part)) + 
+        ggtitle("Middle reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = " ", y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "none",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Plot for the downstream reach (ARO)
+d <- part_plot %>%
+  filter(Section == "ARO") %>%
+  ggplot(aes(x = Units/1000, y = variable, color = value, shape = part, group = part)) + 
+        ggtitle("Downstream reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = "River length since the source of the river (km)", y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "top",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Extract legend from the downstream plot
+legend_2 <- get_legend(d)
+
+# Combine all plots and the legend into a single figure
+ggarrange(
+   legend_2, u, m, d + theme(legend.position = "none"),
+   ncol = 1, nrow = 4, 
+   heights = c(0.5, 3, 4, 5)
+)
+```
+
+![](Mapping_intermittency_files/figure-gfm/model%20a-1.png)<!-- -->
+
+### Model b
+
+The code below prepares the data for Model b following the same
+procedure used for Model a. The dataset is split into training and
+testing sets, predictions are generated using the corresponding random
+forest model, and both observed and predicted classes are combined for
+visualization. The processed data will later be used to compare spatial
+and temporal patterns of predicted water conditions across the river
+sections.
+
+``` r
+set.seed(100)
+
+# Split Model B dataset (data_obs_PS) into training (75%) and testing (25%)
+index <- createDataPartition(data_obs_PS[,5], p = 0.75, list = FALSE)
+
+x_train_b <- data_obs_PS[index, -c(1:6)]
+x_test_b  <- data_obs_PS[-index, -c(1:6)]
+
+y_train_b <- as.factor(data_obs_PS[index, 5])
+y_test_b  <- as.factor(data_obs_PS[-index, 5])
+
+# obs column
+colnames(data_obs_PS)[5] <- "obs"
+
+# Training data
+train_plot <- data_obs_PS[index, ]
+train_plot$pred <- rf_PS5x$predicted
+
+
+train_plot <- melt(train_plot[,-c(1,6)], measure.vars = c("obs", "pred"))
+
+# Testing data
+set.seed(100)
+predictions <- predict(rf_PS5x, x_test_b)
+
+result <- x_test_b
+result['obs']  <- y_test_b
+result['pred'] <- predictions
+
+test_plot <- cbind(data_obs_PS[-index, -c(1,6)], result[, 6:7])
+test_plot <- melt(test_plot, measure.vars = c("obs", "pred"))
+
+# Combine training and testing sets
+test_plot$part  <- "test"
+train_plot$part <- "train"
+
+part_plot <- rbind(train_plot, test_plot) 
+part_plot$part <- factor(part_plot$part, levels = c("train", "test"))
+
+# Format variables for visualization 
+part_plot$Month <- paste(part_plot$Month, "/2022", sep = "")
+part_plot$Month <- factor(part_plot$Month, levels = c("4/2022", "5/2022", "6/2022", "11/2022"))
+
+part_plot$value <- gsub("Partially", "Transition", part_plot$value)
+part_plot$value <- gsub("NotDet", "Not Determined", part_plot$value)
+part_plot$value <- factor(part_plot$value, 
+                          levels = c("Not Determined", "Dry", "Transition", "Wet"))
+```
+
+``` r
+# Define colors again (four categories)
+wc_colors <- c("#CA0020", "#F4A582", "#92C5DE", "#1F78B4")
+
+# Upstream reach (BN)
+u <- part_plot %>%
+  filter(Section == "BN") %>%
+  ggplot(aes(x = Units/1000, y = variable, 
+             color = value, shape = part, group = part)) + 
+        ggtitle("Model b \nUpstream reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = " ", y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "none",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Middle reach (BAR)
+m <- part_plot %>%
+  filter(Section == "BAR") %>%
+  ggplot(aes(x = Units/1000, y = variable, 
+             color = value, shape = part, group = part)) + 
+        ggtitle("Middle reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = " ", y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "none",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Downstream reach (ARO)
+d <- part_plot %>%
+  filter(Section == "ARO") %>%
+  ggplot(aes(x = Units/1000, y = variable, 
+             color = value, shape = part, group = part)) + 
+        ggtitle("Downstream reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = "River length since the source of the river (km)", 
+             y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "top",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Extract legend from downstream plot
+legend_2 <- get_legend(d)
+
+# Combine all plots vertically with shared legend
+ggarrange(
+  legend_2, u, m, d + theme(legend.position = "none"),
+  ncol = 1, nrow = 4,
+  heights = c(0.5, 4, 4, 5)
+)
+```
+
+![](Mapping_intermittency_files/figure-gfm/model%20b-1.png)<!-- -->
+
+### Model c
+
+The code below applies the same workflow to Model C, using all
+drone-based data and only precipitation as dynamic difference. It
+combines observed and predicted water condition classes for both
+training and testing datasets, formats them for visualization, and
+generates plots for the upstream (BN), middle (BAR), and downstream
+(ARO) river sections. February 2022 data are excluded from the middle
+reach due to incomplete observations.
+
+``` r
+set.seed(100)
+
+# Split Model c dataset (data_obs_UAV) into training (75%) and testing (25%)
+index <- createDataPartition(data_obs_UAV[,5], p=0.75, list=FALSE)
+
+x_train_c <- data_obs_UAV[index,-c(1:6)]
+x_test_c <- data_obs_UAV[-index,-c(1:6)]
+
+y_train_c <- as.factor(data_obs_UAV[index,5])
+y_test_c <- as.factor(data_obs_UAV[-index,5])
+
+# obs column
+colnames(data_obs_UAV)[5] <- "obs"
+
+# Training data
+train_plot <- data_obs_UAV[index, ]
+train_plot$pred <- rf_Drone5x$predicted
+
+train_plot <- melt(train_plot[, -c(1,6)], measure.vars = c("obs", "pred"))
+
+# Testing data
+set.seed(100)
+predictions <- predict(rf_Drone5x, x_test_c)
+
+result <- x_test_c
+result['obs']  <- y_test_c
+result['pred'] <- predictions
+
+test_plot <- cbind(data_obs_UAV[-index, -c(1,6)], result[, 6:7])
+test_plot <- melt(test_plot, measure.vars = c("obs", "pred"))
+
+# Combine training and testing sets
+test_plot$part  <- "test"
+train_plot$part <- "train"
+
+part_plot <- rbind(train_plot, test_plot)
+part_plot$part <- factor(part_plot$part, levels = c("train", "test"))
+
+# Format variables for visualization
+part_plot$Month <- paste(part_plot$Month, "/2022", sep = "")
+part_plot$Month <- factor(part_plot$Month, 
+                          levels = c("2/2022", "3/2022", "4/2022", "5/2022", "6/2022", "11/2022"))
+
+part_plot$value <- gsub("Partially", "Transition", part_plot$value)
+part_plot$value <- gsub("NotDet", "Not Determined", part_plot$value)
+part_plot$value <- factor(part_plot$value, 
+                          levels = c("Not Determined", "Dry", "Transition", "Wet"))
+```
+
+``` r
+# Define colors again (four categories)
+wc_colors <- c("#CA0020", "#F4A582", "#92C5DE", "#1F78B4")
+
+# Upstream reach (BN)
+u <- part_plot %>%
+  filter(Section == "BN") %>%
+  ggplot(aes(x = Units/1000, y = variable, 
+             color = value, shape = part, group = part)) + 
+        ggtitle("Model c \nUpstream reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = " ", y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "none",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Middle reach (BAR) — February 2022 removed due to inconsistent data
+m <- part_plot %>%
+  filter(Section == "BAR") %>%
+  filter(Month != "2/2022") %>%
+  ggplot(aes(x = Units/1000, y = variable, 
+             color = value, shape = part, group = part)) + 
+        ggtitle("Middle reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = " ", y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "none",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Downstream reach (ARO)
+d <- part_plot %>%
+  filter(Section == "ARO") %>%
+  ggplot(aes(x = Units/1000, y = variable, 
+             color = value, shape = part, group = part)) + 
+        ggtitle("Downstream reach") +
+        geom_point(position = position_dodge(width = 0.3)) + 
+        labs(x = "River length since the source of the river (km)", 
+             y = " ", color = "") +
+        scale_color_manual(values = wc_colors) +
+        facet_grid(Month ~ ., scales = "free") +
+        guides(color = guide_legend(reverse = TRUE)) +
+        theme_classic() +
+        theme(
+          legend.position = "top",
+          legend.title = element_blank(),
+          text = element_text(size = 16, family = "Times"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.text = element_text(size = 14)
+        )
+
+# Extract legend and combine plots into a single figure
+legend_2 <- get_legend(d)
+
+ggarrange(
+  legend_2, u, m, d + theme(legend.position = "none"),
+  ncol = 1, nrow = 4,
+  heights = c(0.5, 4, 4, 5)
+)
+```
+
+![](Mapping_intermittency_files/figure-gfm/model%20c-1.png)<!-- -->
+
+## Temporal evaluation: apply models to all avaliable dates for the whole river
+
+### Model a
+
+After loading the input dataset, we clean it to retain only complete
+cases, make predictions for water condition classes along the river, and
+save the results. Finally, we visualize the temporal distribution of
+predicted classes over the year 2022 as proportions per date.
+
+``` r
+# Load and clean input data
+input <- read.csv("../Modelling_Intermittency/Input/Umb_all_input_SENTmndwi.csv")
+input$date <- as.Date(input$date, format="%d/%m/%Y")
+river_test <- input[complete.cases(input),]
+
+# Load trained model
+#load("rf_selSent5.RData")
+
+# Predict using the Random Forest model
+set.seed(99)
+predictions_river <- predict(rf_selSent5x, river_test[,-c(1:2)])
+result_river <- river_test
+result_river['predicted'] <-  predictions_river
+
+# Format for plotting
+result_river$date <- as.Date(result_river$date)
+result_river$predicted <- sub("Partially", "Transition", result_river$predicted)
+result_river$predicted <- sub("NotDet", "Not Determined", result_river$predicted)
+result_river$predicted <- factor(result_river$predicted, levels = c('Not Determined',"Dry","Transition", "Wet"))
+
+# Plot temporal distribution of predicted classes
+wc_colors <- c("#CA0020","#F4A582","#92C5DE","#1F78B4")
+st <- result_river %>%
+  group_by(date,predicted) %>%
+  summarise(n = n()) %>%
+  mutate(freq=n/sum(n)*100) %>%
+  ggplot(aes(x=date, y=freq, fill=predicted))+
+  geom_col()+
+  scale_fill_manual(values = wc_colors)+
+  scale_x_date(breaks = "1 month", date_labels = '%b', 
+               limits = as.Date(c("2022-01-01","2022-12-31")))+
+  ylab("Proportion (%)")+xlab("")+
+  theme_classic()
+```
+
+    ## `summarise()` has grouped output by 'date'. You can override using the
+    ## `.groups` argument.
+
+``` r
+st
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-44-1.png)<!-- -->
+
+### Model b
+
+Here we do that same for model b, and apply the trained model to the
+full river dataset. After loading and cleaning the input data, we
+generate predictions for water condition classes along the river. The
+predicted classes are then formatted and visualized as proportions over
+the year 2022 for all available dates.
+
+``` r
+# Load and clean input data
+input <- read.csv("../Modelling_Intermittency/Input/Umb_all_input_PSndvi.csv")
+colnames(input)[3] <- "date"
+input$date <- as.Date(input$date)
+river_test <- input[complete.cases(input),]
+
+# Load trained model
+#load("rf_selPS5.RData")
+
+# Predict using the Random Forest model
+set.seed(99)
+predictions_river <- predict(rf_PS5x, river_test[,-c(1:3,9)])
+result_riverPS <- river_test
+result_riverPS['predicted'] <-  predictions_river
+
+# Format predicted classes
+result_riverPS$date <- as.Date(result_riverPS$date)
+result_riverPS$predicted <- sub("Partially", "Transition", result_riverPS$predicted)
+result_riverPS$predicted <- sub("NotDet", "Not Determined", result_riverPS$predicted)
+result_riverPS$predicted <- factor(result_riverPS$predicted, 
+                                   levels = c('Not Determined',"Dry","Transition", "Wet"))
+
+# Plot temporal distribution of predicted classes
+wc_colors <- c("#CA0020","#F4A582","#92C5DE","#1F78B4")
+ps <- result_riverPS %>%
+  group_by(date,predicted) %>%
+  summarise(n = n()) %>%
+  mutate(freq=n/sum(n)*100) %>%
+  ggplot(aes(x=date, y=freq, fill=predicted))+
+  geom_col()+
+  scale_fill_manual(values = wc_colors)+
+  scale_x_date(breaks = "1 month", date_labels = '%b', 
+               limits = as.Date(c("2022-01-01","2022-12-31")))+
+  ylab("Proportion (%)")+xlab("")+
+  theme_classic()
+```
+
+    ## `summarise()` has grouped output by 'date'. You can override using the
+    ## `.groups` argument.
+
+``` r
+ps
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-45-1.png)<!-- -->
+
+### Model c
+
+Same for model c, we load and clen the input data, we generate
+predictions for water condition classes along the river. The predicted
+classes are then formatted and visualized as proportions over the year
+2022 for all available dates.
+
+``` r
+# Load and clean input data
+input <- read.csv('../Modelling_Intermittency/Input/Umb_all_input_acm30.csv')
+input$date <- as.Date(input$date)
+river_test <- input[complete.cases(input),]
+
+# Predict using the Random Forest model
+predictions_river <- predict(rf_Drone5x, river_test[,-c(1:3)])
+result_riverDr <- river_test
+result_riverDr$predicted <- predictions_river
+
+# Format predicted classes
+result_riverDr$date <- as.Date(result_riverDr$date)
+result_riverDr$predicted <- sub("Partially", "Transition", result_riverDr$predicted)
+result_riverDr$predicted <- sub("NotDet", "Not Determined", result_riverDr$predicted)
+result_riverDr$predicted <- factor(result_riverDr$predicted, levels = c('Not Determined',"Dry","Transition", "Wet"))
+
+# Plot temporal distribution of predicted classes
+wc_colors <- c("#CA0020","#F4A582","#92C5DE","#1F78B4")
+dr <- result_riverDr %>%
+  group_by(date,predicted) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n/sum(n)*100) %>%
+  ggplot(aes(x = date, y = freq, fill = predicted))+
+  geom_col(colour = NA)+
+  scale_fill_manual(values = wc_colors)+
+  scale_x_date(breaks = "1 month", date_labels = '%b')+
+  ylab("Proportion (%)")+ xlab("")+
+  theme_classic()
+```
+
+    ## `summarise()` has grouped output by 'date'. You can override using the
+    ## `.groups` argument.
+
+``` r
+dr
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-46-1.png)<!-- -->
+
+### All models
+
+In this section, we combine the outputs of all three Random Forest
+models (Models A, B, and C) with monthly precipitation to visualize how
+water conditions along the river relate to rainfall patterns.
+Precipitation is represented as a reversed bar plot to visually
+highlight months with higher rainfall at the top of the plot. This
+layout facilitates comparison between rainfall events and predicted
+water conditions along the river.
+
+``` r
+# Read the precipitation data
+Rain_bea <- read.csv("../Modelling_Intermittency/Input/Rain_bea_2022.csv")
+Rain_bea$Date <- as.Date(Rain_bea$Date)
+
+# Only precipitation plot
+ppt_only <- Rain_bea %>%
+    group_by(month = lubridate::floor_date(Date, "month")) %>%
+    dplyr::summarize(rain = sum(EP2)) %>%
+    ggplot(aes(month, rain)) +
+    geom_col(fill="black") +
+    scale_x_date(limits = as.Date(c("2022-01-01", "2022-12-15")),
+                 breaks = "1 month", date_labels = '%b') +
+    ylab("Precipitation (mm)") + xlab("") +
+    theme_classic() +
+    theme(axis.text = element_text(size=15, family="serif", colour="black"),
+          axis.title.y = element_text(size=15, family="serif", hjust=1, colour="black"))
+
+ppt_only
+```
+
+    ## Warning: Removed 1 row containing missing values or values outside the scale range
+    ## (`geom_col()`).
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-47-1.png)<!-- -->
+
+``` r
+# Customize model plots: titles, labels, themes
+st <- st + labs(title="Model a", y="") +
+              guides(fill = guide_legend(reverse = TRUE)) +
+              theme(legend.title = element_blank(),
+                    text = element_text(size=16, family="Times"),
+                    plot.title = element_text(size = 16, face = "bold"),
+                    legend.text = element_text(size=14))
+
+ps <- ps + labs(title="Model b") +
+              theme(text = element_text(size=16, family="Times"),
+                    plot.title = element_text(size = 16, face = "bold"))
+
+dr <- dr + labs(title="Model c", y="") +
+              theme(text = element_text(size=16, family="Times"),
+                    plot.title = element_text(size = 16, face = "bold"))
+
+# Aggregate precipitation monthly
+ppt <- Rain_bea %>%
+    group_by(month = lubridate::floor_date(Date, "month")) %>%
+    dplyr::summarize(rain = sum(EP2)) %>%
+    ggplot(aes(month, rain)) +
+    geom_col(fill="black") +
+    scale_x_date(limits = as.Date(c("2022-01-01", "2022-12-31")), 
+                 breaks = "1 month", date_labels = '%b', position = "top") +
+    scale_y_reverse() +  # Reverse y-axis to place high rainfall at top
+    ylab("Precipitation (mm)") + xlab("") +
+    theme_classic() +
+    theme(text = element_text(size=16, family="Times"))
+
+# Combine precipitation and model plots vertically
+ggarrange(ppt, st, ps, dr, nrow = 4, common.legend = TRUE)
+```
+
+    ## Warning: Removed 1 row containing missing values or values outside the scale range
+    ## (`geom_col()`).
+    ## Removed 1 row containing missing values or values outside the scale range
+    ## (`geom_col()`).
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-48-1.png)<!-- -->
+\## Spatiotemporal evaluation of predicted water conditions
+
+To better visualize the spatial variability captured by each model, the
+classified results were mapped across the entire river network. These
+maps display the predicted surface conditions along the riverbed for
+each available date. The visualization highlights spatial patterns in
+water presence and transitions over time, providing an integrated view
+of the temporal and spatial dynamics represented by each model. Because
+Model C includes daily predictions throughout the year, plotting its
+results directly on the river shapefile would obscure temporal
+variation.
+
+### Model a
+
+``` r
+# Load shapefile and convert to sf object
+Umb <- shapefile("Input/Umb_distDams.shp") %>% 
+  sf::st_as_sf(crs = 4326)
+
+# Merge model predictions with the shapefile
+Umb_pred <- merge(Umb, result_river, by.x = "CNGMETER_C", by.y = "Units")
+
+# Define color palette (same as before)
+wc_colors <- c("#CA0020","#F4A582","#92C5DE","#1F78B4")
+
+# Plot spatial distribution of predicted classes per date
+ggplot(Umb_pred) +
+  geom_sf(aes(fill = predicted), color = NA) +
+  scale_fill_manual(values = wc_colors) +
+  facet_wrap(~ date, ncol = 2) +
+  ggtitle("Model a – Spatial distribution of predicted water conditions") +
+  theme_bw(base_size = 16) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank(),
+    strip.background = element_rect(fill = "white", color = "black"),
+    panel.grid = element_blank(),
+    text=element_text(size= 16, family= "Times")
+  )
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-49-1.png)<!-- -->
+
+### Model b
+
+``` r
+# Merge predictions with river shapefile
+Umb_predPS <- merge(
+  x = Umb,
+  y = result_riverPS,
+  by.x = "CNGMETER_C",
+  by.y = "Units"
+)
+
+# Define colors consistent with other models
+wc_colors <- c("#CA0020", "#F4A582", "#92C5DE", "#1F78B4")
+
+# Plot classified results for each available date
+ggplot(Umb_predPS) +
+  geom_sf(aes(fill = predicted), color = NA) +
+  facet_wrap(~date, ncol = 2) +
+  scale_fill_manual(values = wc_colors, drop = FALSE) +
+  labs(
+    title = "Model b – Spatial distribution of predicted river conditions",
+    fill = "Predicted class"
+  ) +
+  theme_bw(base_size = 16) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank(),
+    strip.background = element_rect(fill = "white", color = "black"),
+    panel.grid = element_blank(),
+    text=element_text(size= 16, family= "Times")
+  )
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-50-1.png)<!-- -->
+
+## Heatmaps of water condition along the river
+
+To visualize the temporal evolution of predicted water conditions along
+the river, the results from all models were summarized in heatmaps
+showing river length on the x-axis and time on the y-axis. This
+representation highlights both spatial and seasonal patterns of water
+presence and absence.
+
+``` r
+library(scales)
+
+#Function to revert dates in the axis
+reverse2_trans <- function() {
+  trans_new(
+    "reverse2",
+    function(x) -1 * as.numeric(x), # Force values to be numeric for Date objects
+    function(x) -1 * as.numeric(x)
+  )
+}
+```
+
+``` r
+# Define color palette
+wc_colors <- c("#CA0020", "#F4A582", "#92C5DE", "#1F78B4")
+
+# Prepare and combine data 
+result_river$model <- "Model a"
+result_riverPS$model <- "Model b"
+result_riverDr$model <- "Model c"
+
+heat_all <- bind_rows(
+  result_river[, c("Units", "date", "predicted", "model")],
+  result_riverPS[, c("Units", "date", "predicted", "model")],
+  result_riverDr[, c("Units", "date", "predicted", "model")]
+)
+
+heat_all$Units_km <- heat_all$Units / 1000
+
+# Plot --------------------------------------------------------------------
+ggplot(heat_all, aes(x = Units_km, y = date, fill = predicted)) +
+  geom_tile(color = NA) +
+  scale_fill_manual(values = wc_colors, drop = FALSE) +
+  scale_y_continuous(trans = c("date", "reverse2"))+
+  facet_grid(model ~ ., scales = "free_y", switch = "y") +
+  labs(
+    title = "Spatiotemporal distribution of predicted river conditions",
+    x = "River length (km)",
+    y = "",
+    fill = "Predicted class"
+  ) +
+  theme_classic(base_size = 16) +
+  theme(
+    text = element_text(family = "Times"),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 12),
+    strip.background = element_rect(fill = "white", color = "black"),
+    strip.text.y = element_text(size = 14, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-52-1.png)<!-- -->
+
+## Statial evaluation: Water in the riverbed
+
+This section evaluates the spatial distribution of water in the riverbed
+along the Umbuzeiro River using the outputs from the three models (A, B,
+C). For each model, we counted the number of days in 2022 where each
+river segment was classified as ‘Wet’ or ‘Transition’ and merged these
+counts into a single table (ndays_todos) for subsequent analysis.
+
+``` r
+compute_ndays <- function(result, model_name) {
+  ndays <- result %>%
+    filter(predicted %in% c("Wet","Transition")) %>%
+    group_by(Units) %>%
+    summarise(n = n())
+  
+  result_merge <- merge(result, ndays, by="Units", all.x=T)
+  #result_merge$model <- model_name
+  result_merge$n[is.na(result_merge$n)] <- 0
+  return(result_merge)
+}
+
+ndays_drone <- compute_ndays(result_riverDr, "Model c")
+ndays_sent  <- compute_ndays(result_river, "Model a")
+ndays_ps    <- compute_ndays(result_riverPS, "Model b")
+
+ndays_todos <- rbind(ndays_drone[,c("Units","model", "n")],
+                     ndays_sent[,c("Units","model", "n")],
+                     ndays_ps[,c("Units","model", "n")])
+```
+
+For each river segment, we calculate the percentage of days with water
+presence (WIR) with model-specific normalization: Because each model has
+a different temporal resolution, we standardize the counts of days with
+water presence (n) into percentages:
+
+- Model A (Sentinel-2): divide by 12 (12 monthly images in 2022).
+
+- Model B (PlanetScope): divide by 13 (13 dates available in 2022).
+
+- Model C (Drone): divide by 365 days (daily data).
+
+The resulting percentages are mapped along the river using `geom_sf()`,
+with a continuous blue gradient indicating higher water presence.
+
+Dam locations are overlaid as red crosses to provide context on how
+infrastructure may influence water persistence.
+
+``` r
+# Load shapefile and merge with ndays_todos table
+Umb <- shapefile("Input/Umb_distDams.shp")
+Umbsf <- Umb %>% sf::st_as_sf(crs = 4326)
+Umb_ndays <- merge(x = Umbsf, y = ndays_todos, by.x = "CNGMETER_C", by.y = "Units")
+
+# Compute percentage of days with water for each model
+ndays_perc <- ndays_todos %>% 
+  mutate(perc = case_when(
+    model == "Model c" ~ n/365,
+    model == "Model b" ~ n/13,
+    model == "Model a" ~ n/12,
+    TRUE ~ NA_real_))  # default if model unknown
+
+# Merge percentages with river shapefile
+Umb_perc <- merge(x = Umbsf, y = ndays_perc, by.x = "CNGMETER_C", by.y = "Units")
+
+# Plot spatial distribution with dam locations and facet by model
+ggplot(Umb_perc) +
+  geom_sf(aes(fill=perc, color=perc),linewidth=1.5) + # river segments colored by % days with water
+  scale_fill_continuous( 
+        high = "darkblue",
+        low = "lightgrey", 
+        name = "Percentage of days \n with water in \n the riverbed (WIR)",
+        labels = scales::label_percent(scale = 100)
+       )+
+  scale_color_continuous( 
+        high = "darkblue",
+        low = "lightgrey",
+        name = "Percentage of days \n with water in \n the riverbed (WIR)",
+        labels = scales::label_percent(scale = 100)
+       )+
+  geom_point(data=Umb_ndays[which(Umb_ndays$Dam != 0),], # overlay dam locations
+    aes(geometry = geometry, colour="Dam location"),
+    stat = "sf_coordinates", shape=4, size=1.5,color="red")+
+  facet_grid(model~., switch="both")+ # separate plots per model
+  theme_bw(base_size = 18) +
+  theme(strip.background = element_rect(fill = "white", colour = "black"),
+        panel.grid = element_blank(),
+        legend.position = "right",
+        legend.title = element_text(),
+        legend.spacing.y = unit(0.2, 'cm'),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.line= element_blank(),
+        axis.title = element_blank(),
+        text=element_text(size= 18, family= "Times"))
+```
+
+![](Mapping_intermittency_files/figure-gfm/unnamed-chunk-54-1.png)<!-- -->
