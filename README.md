@@ -44,5 +44,7 @@ Please cite the associated publication when using this repository.
 **Data and code availability:** The R code and datasets are publicly available here. Code is released under the MIT License, and input data under the CC-BY 4.0 License. 
 
 **Contact**
+
 For questions regarding this repository or data requests, contact:
+
 Suziane Soares – [soaresns@alu.ufc.br]
