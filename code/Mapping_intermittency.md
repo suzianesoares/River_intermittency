@@ -1,6 +1,6 @@
 Mapping intermittency: train, test and application of models
 ================
-Soares et al. (2025)
+Soares et al. (2026)
 
 ``` r
 pacman::p_load('Boruta','caret', 'doSNOW', 'dplyr','forcats', 'ggplot2','ggpubr','Metrics','randomForest', 'raster', 'reshape')
@@ -1128,7 +1128,7 @@ p <- part_plot %>%
              color = value, shape = part, group = part)) + 
         ggtitle("Model a \nDownstream reach") +
         geom_point(position = position_dodge(width = 0.3)) + 
-        labs(x = "River length since the source of the river (km)", 
+        labs(x = "River length from source (km)", 
              y = " ", color = "") +
         scale_color_manual(values = wc_colors) +
         scale_x_continuous(limits = c(85, 89)) +
@@ -1223,7 +1223,7 @@ d <- part_plot %>%
   ggplot(aes(x = Units/1000, y = variable, color = value, shape = part, group = part)) + 
         ggtitle("Downstream reach") +
         geom_point(position = position_dodge(width = 0.3)) + 
-        labs(x = "River length since the source of the river (km)", y = " ", color = "") +
+        labs(x = "River length from source (km)", y = " ", color = "") +
         scale_color_manual(values = wc_colors) +
         facet_grid(Month ~ ., scales = "free") +
         guides(color = guide_legend(reverse = TRUE)) +
@@ -1240,6 +1240,7 @@ d <- part_plot %>%
 legend_2 <- get_legend(d)
 
 # Combine all plots and the legend into a single figure
+
 ggarrange(
    legend_2, u, m, d + theme(legend.position = "none"),
    ncol = 1, nrow = 4, 
@@ -1360,7 +1361,7 @@ d <- part_plot %>%
              color = value, shape = part, group = part)) + 
         ggtitle("Downstream reach") +
         geom_point(position = position_dodge(width = 0.3)) + 
-        labs(x = "River length since the source of the river (km)", 
+        labs(x = "River length from source (km)", 
              y = " ", color = "") +
         scale_color_manual(values = wc_colors) +
         facet_grid(Month ~ ., scales = "free") +
@@ -1378,6 +1379,7 @@ d <- part_plot %>%
 legend_2 <- get_legend(d)
 
 # Combine all plots vertically with shared legend
+
 ggarrange(
   legend_2, u, m, d + theme(legend.position = "none"),
   ncol = 1, nrow = 4,
@@ -1499,7 +1501,7 @@ d <- part_plot %>%
              color = value, shape = part, group = part)) + 
         ggtitle("Downstream reach") +
         geom_point(position = position_dodge(width = 0.3)) + 
-        labs(x = "River length since the source of the river (km)", 
+        labs(x = "River length from source (km)", 
              y = " ", color = "") +
         scale_color_manual(values = wc_colors) +
         facet_grid(Month ~ ., scales = "free") +
@@ -1515,6 +1517,7 @@ d <- part_plot %>%
 
 # Extract legend and combine plots into a single figure
 legend_2 <- get_legend(d)
+
 
 ggarrange(
   legend_2, u, m, d + theme(legend.position = "none"),
@@ -1728,7 +1731,7 @@ ps <- ps + labs(title="Model b") +
               theme(text = element_text(size=16, family="Times"),
                     plot.title = element_text(size = 16, face = "bold"))
 
-dr <- dr + labs(title="Model c", y="") +
+dr <- dr + labs(title="Model c", y="", x="2022") +
               theme(text = element_text(size=16, family="Times"),
                     plot.title = element_text(size = 16, face = "bold"))
 
