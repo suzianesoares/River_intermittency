@@ -15,9 +15,9 @@ The repository allows reproduction of all figures and analyses presented in the 
 ## Repository Structure
 River_intermittency/
 
-├─ README.md             # this file
+├─ README.md                 # this file
 
-├─ LICENSE               # code license (MIT)
+├─ LICENSE                   # code license (MIT)
 
 ├─ input/                # processed input data used in models
 
