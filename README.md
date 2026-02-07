@@ -19,11 +19,11 @@ River_intermittency/
 
 ├─ LICENSE                   # code license (MIT)
 
-├─ input/                # processed input data used in models
+├─ input/                    # processed input data used in models
 
-│   └─ LICENSE.txt       # data license (CC-BY 4.0)
+│   └─ LICENSE.txt           # data license (CC-BY 4.0)
 
-└─ code/                 # R markdown files for models and visualization 
+└─ code/                     # R markdown files for models and visualization 
 
 
 
